@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load tasks from API
   async function loadTasks() {
     try {
-      const response = await getTasks("active");
+      const response = await getTasks();
       console.log(response);
       taskList.innerHTML = "";
       if (response && response.status === 200 && response.data && Object.keys(response.data).length > 0) {
@@ -150,6 +150,37 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Error deleting task.");
     }
   }
+  
+// --- NEW FUNCTION: update task status ---
+
+async function updateTaskStatus(taskId) {
+  const user = getUser();
+  if (!user || !user.id) {
+    alert("User not logged in.");
+    return;
+  }
+  try {
+    const response = await $.ajax({
+      url: `${API}/statusItem_action.php`,
+      method: "POST",
+      data: JSON.stringify({
+        user_id: user.id,
+        item_id: taskId,
+        status: "inactive"   // only ever mark inactive
+      }),
+    });
+
+    const data = typeof response === "string" ? JSON.parse(response) : response;
+    if (data.status === 200) {
+      console.log(`Task ${taskId} marked inactive`);
+       // refresh task list
+    } else {
+      console.error("Error updating task:", data.message);
+    }
+  } catch (err) {
+    console.error("Error in updateTaskStatus:", err);
+  }
+}
 
   // Handle add task form submit
   if (addTaskForm) {
@@ -182,6 +213,13 @@ document.addEventListener("DOMContentLoaded", () => {
           editTask(taskId, newName, newDesc);
         }
       }
+    const checkbox = e.target.closest("input[type='checkbox']");
+      if (checkbox) {
+      const taskId = e.target.closest("li").querySelector(".delete-btn").getAttribute("data-id");
+      if(checkbox.checked){
+      updateTaskStatus(taskId);
+      }
+    }
   });
 }
 
@@ -191,8 +229,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("taskModal").classList.remove("hidden");
     document.getElementById("taskName").focus();
   };
-
   window.closeModal = function () {
+
     document.getElementById("modalOverlay").classList.add("hidden");
     document.getElementById("taskModal").classList.add("hidden");
     if (addTaskForm) addTaskForm.reset();
@@ -209,14 +247,40 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Helper: get tasks from API
-function getTasks(status = "active") {
+
+async function getTasks() {
   const user = getUser();
   if (!user || !user.id) {
     return Promise.reject("No user logged in.");
   }
-  return $.ajax({
-    url: `${API}/getItems_action.php?status=${status}&user_id=${user.id}`,
-    method: "GET",
-    dataType: "json"
-  });
+
+  try {
+    // Make both requests in parallel
+    const [activeResponse, inactiveResponse] = await Promise.all([
+      $.ajax({
+        url: `${API}/getItems_action.php?user_id=${user.id}&status=active`,
+        method: "GET",
+        dataType: "json"
+      }),
+      $.ajax({
+        url: `${API}/getItems_action.php?user_id=${user.id}&status=inactive`,
+        method: "GET",
+        dataType: "json"
+      })
+    ]);
+
+    // Combine the results
+    const combinedData = {
+      status: 200,
+      data: {
+        ...activeResponse.data,
+        ...inactiveResponse.data
+      }
+    };
+
+    return combinedData;
+  } catch (err) {
+    console.error("Error fetching tasks:", err);
+    throw err;
+  }
 }
