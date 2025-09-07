@@ -14,12 +14,12 @@ loginForm.on('submit', (e) =>{
 });
 
 function login(account){
-    const CALL = new XMLHttpRequest();
+    const xhttp = new XMLHttpRequest();
     const url = `${API}/signin_action.php?email=${account['email']}&password=${account['password']}`;
-    CALL.open("GET", url , true);
+    xhttp.open("GET", url , true);
     
-    CALL.onload = function () {
-        const response = JSON.parse(CALL.responseText);
+    xhttp.onload = () => {
+        const response = JSON.parse(xhttp.responseText);
         if(response.status === 200){
             setUser(response.data);
             window.location.href = `${BASE_URL}/index.html`;
@@ -28,9 +28,9 @@ function login(account){
         }
     };
 
-    CALL.onerror = function () {
+    xhttp.onerror = function () {
         console.error("Network error occurred");
     };
 
-    CALL.send();
+    xhttp.send();
 }

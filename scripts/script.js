@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     }
 });
 
+
 logout.on('click', ()=>{
     logOut();
     window.location.replace(`${BASE_URL}/login.html`);
