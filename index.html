@@ -97,6 +97,19 @@
               placeholder="••••••••"
             />
           </div>
+          <div>
+            <label
+              for="signup-confirm-password"
+              class="block text-sm font-medium text-paper"
+              >Confirm Password</label
+            >
+            <input
+              type="password"
+              id="signup-confirm-password"
+              class="mt-1 w-full text-paper rounded-lg placeholder:text-asphaltp border border-paper px-3 py-2 focus:outline-none focus:ring-1 focus:ring-asphaltf transition duration-200"
+              placeholder="••••••••"
+            />
+          </div>
         </div>
 
         <button
@@ -174,25 +187,8 @@
       </form>
     </section>
 
-    <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        const signInForm = document.getElementById("signInForm");
-        const signUpForm = document.getElementById("signUpForm");
-        const showSignUpBtn = document.getElementById("showSignUp");
-        const showSignInBtn = document.getElementById("showSignIn");
-
-        showSignUpBtn.addEventListener("click", function (e) {
-          e.preventDefault();
-          signInForm.style.display = "none";
-          signUpForm.style.display = "block";
-        });
-
-        showSignInBtn.addEventListener("click", function (e) {
-          e.preventDefault();
-          signUpForm.style.display = "none";
-          signInForm.style.display = "block";
-        });
-      });
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script type="module" src="scripts/index.js">
     </script>
   </body>
 </html>
