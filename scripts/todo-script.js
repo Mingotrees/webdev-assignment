@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   <label class="text-md text-paper ms-3">${item.item_name}</label>
                 </div>
                 <div class="text-paper space-x-8">
-                  <button class="cursor-pointer edit-btn">
+                  <button class="cursor-pointer edit-btn" data-id="${item.item_id}">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -72,6 +72,39 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Error fetching tasks:", err);
       taskList.innerHTML = "<li>Error loading tasks.</li>";
+    }
+  }
+
+  async function editTask(taskId, newName, newDesc) {
+    const user = getUser();
+    if (!user || !user.id) {
+      alert("User not logged in.");
+      return;
+    }
+    try {
+      const response = await $.ajax({
+        url: `${API}/editItem_action.php`,
+        method: "POST",
+        data: JSON.stringify({
+          item_id: taskId,
+          item_name: newName,
+          item_description: newDesc,
+          status: "active"
+        }),
+        
+      });
+      console.log("Task ID: ", taskId);
+      const data = JSON.parse(response);
+      
+      if (data.status === 200) {
+        alert("Edit success");
+        loadTasks();
+      } else {
+        alert(data.message || "Error updating task.");
+      }
+    } catch (err) {
+      console.error("Error editing task:", err);
+      alert("Error editing task.");
     }
   }
 
@@ -138,6 +171,17 @@ document.addEventListener("DOMContentLoaded", () => {
         deleteTask(taskId);
       }
     }
+    const editBtn = e.target.closest(".edit-btn");
+      if (editBtn) {
+        const taskId = editBtn.getAttribute("data-id");
+        const currentName = editBtn.getAttribute("data-name");
+        const currentDesc = editBtn.getAttribute("data-desc");
+        const newName = prompt("Edit task name:", currentName);
+        const newDesc = prompt("Edit task description:", currentDesc);
+        if (newName && newDesc) {
+          editTask(taskId, newName, newDesc);
+        }
+      }
   });
 }
 
