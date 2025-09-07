@@ -1,5 +1,5 @@
-let USER = localStorage.getItem('user');
-export const BASE_URL = "http://127.0.0.1:3000";
+let USER = JSON.parse(localStorage.getItem('user'));
+export const BASE_URL = "http://127.0.0.1:8080";
 export const API = "https://todo-list.dcism.org";
 
 export function getUser() {

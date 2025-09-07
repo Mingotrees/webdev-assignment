@@ -4,11 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ToDo-App</title>
+    <script type="module" src="scripts/taskScript.js"></script>
 </head>
 <body>
     <button id = "logout-btn">logout</button>
 
+    <h2>Add New Task</h2>
+  <form id="addTaskForm">
+    <input type="text" id="taskName" placeholder="Task name" required />
+    <input type="text" id="taskDescription" placeholder="Task description" required />
+    <button type="submit">Add Task</button>
+  </form>
+
+
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script type="module" src="scripts/script.js"></script>
-</body>
+    <script type="module" src="scripts/constants.js"></script>
+    <script type="module"src="scripts/script.js"></script>
+    
+     <h2>Active Tasks</h2>
+    <ul id="taskList"></ul>
+    </body>
 </html>
