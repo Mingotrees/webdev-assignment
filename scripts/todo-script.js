@@ -215,7 +215,14 @@ async function loadTasks() {
       $taskList.empty();
       
       if (response && response.status === 200 && response.data && Object.keys(response.data).length > 0) {
-        Object.values(response.data).forEach(item => {
+        // Convert to array and sort: active tasks first, then inactive tasks
+        const sortedTasks = Object.values(response.data).sort((a, b) => {
+          if (a.status === 'active' && b.status === 'inactive') return -1;
+          if (a.status === 'inactive' && b.status === 'active') return 1;
+          return 0;
+        });
+
+        sortedTasks.forEach(item => {
           const $li = $('<li>').html(`
               <div class="flex items-center justify-between">
                 <div class="inline-flex items-center">
@@ -273,7 +280,7 @@ async function loadTasks() {
                 </div>
               </div>
           `);
-          $taskList.prepend($li);
+          $taskList.append($li);
         
           $li.find('.task-checkbox').on('change', async function() {
             const taskId = $(this).data('id');
