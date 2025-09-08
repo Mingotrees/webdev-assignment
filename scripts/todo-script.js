@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadTasks() {
     try {
       const response = await getTasks();
-      console.log(response);
       taskList.innerHTML = "";
       if (response && response.status === 200 && response.data && Object.keys(response.data).length > 0) {
         Object.values(response.data).forEach(item => {
@@ -71,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       console.error("Error fetching tasks:", err);
-      taskList.innerHTML = "<li>Error loading tasks.</li>";
+      taskList.innerHTML = "<li class = text-paper>Error loading tasks.</li>";
     }
   }
 
