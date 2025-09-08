@@ -12,6 +12,10 @@ export function setUser(user) {
 }
 
 export function logOut(){
-    localStorage.removeItem('user');
-    USER = null;
+    if(getUser()){
+        localStorage.removeItem('user');
+        USER = null;
+    }else{
+        console.log("No Account Exists");
+    }
 }

@@ -67,7 +67,7 @@ signUpForm.on('submit', (e)=>{
     const confirmPassword = $("#signup-confirm-password").val();
 
     if(password != confirmPassword){
-        alert("nope");
+        alert("Password does not match");
         signUpForm.trigger("reset");
         return;
     }
@@ -95,7 +95,7 @@ function register(newAccount){
                 alert("resgistered succesfully, login again");
                 window.location.href = `${BASE_URL}/index.html`;
             }else{
-                console.log("Error ", response.message);
+                alert(response.message);
             }
     };
 

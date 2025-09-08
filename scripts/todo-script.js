@@ -1,7 +1,23 @@
-import { getUser, API } from "./constants.js";
+import { getUser, API, logOut, BASE_URL } from "./constants.js";
+
+let currentEditTaskId = null;
+
 document.addEventListener("DOMContentLoaded", () => {
   const addTaskForm = document.getElementById("addTaskForm");
   const taskList = document.getElementById("taskList");
+  const editTaskForm = document.getElementById("editTaskForm");
+  const signOutBtn = $("#signOut-btn");
+
+  if(!getUser()){
+    alert("Please Log In First");
+    window.location.href = `${BASE_URL}/index.html`;
+  }
+
+
+  signOutBtn.on('click', ()=>{
+      logOut();
+      window.location.href = `${BASE_URL}/index.html`;
+  });
 
   // Load tasks from API
   async function loadTasks() {
@@ -16,12 +32,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="inline-flex items-center">
                   <input
                     type="checkbox"
-                    class="appearance-none text-asphalt border border-paper form-checkbox checked:after:content-['×'] checked:after:text-xs checked:after:bg-paper checked:after:flex checked:after:items-center checked:after:justify-center h-4 w-4"
+                    class="task-checkbox appearance-none text-asphalt border border-paper form-checkbox  checked:after:content-['×'] checked:after:text-xs checked:after:bg-paper checked:after:flex checked:after:items-center checked:after:justify-center h-4 w-4"
+                    data-id="${item.item_id}"
+                    ${item.status === 'inactive' ? 'checked' : ''}
                   />
-                  <label class="text-md text-paper ms-3">${item.item_name}</label>
+                  <div class="flex flex-col">
+                    <label class="task-label text-md ${item.status === 'inactive' ? 'line-through  text-gray-400' : 'text-paper'} ms-3">${item.item_name}</label>
+                    <label class="task-desc text-sm text-[#f9f6ef]/70 mt-1 ms-3">${item.item_description}</label>
+                  </div>
                 </div>
                 <div class="text-paper space-x-8">
-                  <button class="cursor-pointer edit-btn" data-id="${item.item_id}">
+                  <button class="cursor-pointer edit-btn" data-id="${item.item_id}" data-name="${item.item_name}" data-desc="${item.item_description}">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -35,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       class="lucide lucide-pencil-icon lucide-pencil"
                     >
                       <path
-                        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a .5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
                       />
                       <path d="m15 5 4 4" />
                     </svg>
@@ -64,6 +85,23 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
           `;
           taskList.appendChild(li);
+
+          const checkBox = li.querySelector(".task-checkbox");
+          const taskLabel = li.querySelector(".task-label");
+
+          checkBox.addEventListener("change", () => {
+            const taskId = checkBox.getAttribute("data-id");
+            if (checkBox.checked) {
+              taskLabel.classList.remove("text-paper");
+              taskLabel.classList.add("line-through", "text-gray-400");
+              updateTaskStatus(taskId, 'inactive');
+            } else {
+              taskLabel.classList.add("text-paper");
+              taskLabel.classList.remove("line-through", "text-gray-400");
+              updateTaskStatus(taskId, 'active');
+            }
+          });
+
         });
       } else {
         taskList.innerHTML = `<li class= "text-paper" >No tasks found.</li>`;
@@ -96,7 +134,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = JSON.parse(response);
       
       if (data.status === 200) {
-        alert("Edit success");
         loadTasks();
       } else {
         alert(data.message || "Error updating task.");
@@ -108,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Add task via API
-  async function addTask(taskName) {
+  async function addTask(taskName, taskDesc) {
     const user = getUser();
     if (!user || !user.id) {
       alert("User not logged in.");
@@ -120,7 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         data: JSON.stringify({
           user_id: user.id,
-          item_description: "charles butngi ni please",
+          item_description: taskDesc,
           item_name: taskName,
         }),
       });
@@ -152,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
 // --- NEW FUNCTION: update task status ---
 
-async function updateTaskStatus(taskId) {
+async function updateTaskStatus(taskId, status) {
   const user = getUser();
   if (!user || !user.id) {
     alert("User not logged in.");
@@ -165,7 +202,7 @@ async function updateTaskStatus(taskId) {
       data: JSON.stringify({
         user_id: user.id,
         item_id: taskId,
-        status: "inactive"   // only ever mark inactive
+        status: status   // only ever mark inactive
       }),
     });
 
@@ -182,62 +219,88 @@ async function updateTaskStatus(taskId) {
 }
 
   // Handle add task form submit
-  if (addTaskForm) {
+   if (addTaskForm) {
     addTaskForm.addEventListener("submit", function (e) {
       e.preventDefault();
       const taskName = document.getElementById("taskName").value.trim();
+      const description = document.getElementById("description").value.trim();
       if (taskName) {
-        addTask(taskName);
+        addTask(taskName, description);
       }
     });
   }
 
-  if (taskList) {
-    taskList.addEventListener("click", function (e) {
-    const deleteBtn = e.target.closest(".delete-btn");
-    if (deleteBtn) {
-      const taskId = deleteBtn.getAttribute("data-id");
-      if (confirm("Are you sure you want to delete this task?")) {
-        deleteTask(taskId);
+  if (editTaskForm) {
+    editTaskForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const taskName = document.getElementById("editTaskName").value.trim();
+      const description = document
+        .getElementById("editDescription")
+        .value.trim();
+      if (taskName && currentEditTaskId) {
+        editTask(currentEditTaskId, taskName, description);
       }
-    }
-    const editBtn = e.target.closest(".edit-btn");
-      if (editBtn) {
-        const taskId = editBtn.getAttribute("data-id");
-        const currentName = editBtn.getAttribute("data-name");
-        const currentDesc = editBtn.getAttribute("data-desc");
-        const newName = prompt("Edit task name:", currentName);
-        const newDesc = prompt("Edit task description:", currentDesc);
-        if (newName && newDesc) {
-          editTask(taskId, newName, newDesc);
+    });
+  }
+
+if (taskList) {
+    taskList.addEventListener("click", function (e) {
+      const deleteBtn = e.target.closest(".delete-btn");
+      const editBtn = e.target.closest(".edit-btn");
+
+      if (deleteBtn) {
+        const taskId = deleteBtn.getAttribute("data-id");
+        if (confirm("Are you sure you want to delete this task?")) {
+          deleteTask(taskId);
         }
       }
-    const checkbox = e.target.closest("input[type='checkbox']");
-      if (checkbox) {
-      const taskId = e.target.closest("li").querySelector(".delete-btn").getAttribute("data-id");
-      if(checkbox.checked){
-      updateTaskStatus(taskId);
+
+      if (editBtn) {
+        const taskId = editBtn.getAttribute("data-id");
+        const taskName = editBtn.getAttribute("data-name");
+        const taskDesc = editBtn.getAttribute("data-desc");
+
+        openEditModal(taskId, taskName, taskDesc);
       }
-    }
-  });
-}
+    });
+  }
 
   // Modal functions
-  window.openModal = function () {
+    window.openModal = function () {
     document.getElementById("modalOverlay").classList.remove("hidden");
     document.getElementById("taskModal").classList.remove("hidden");
     document.getElementById("taskName").focus();
   };
-  window.closeModal = function () {
 
+  window.closeModal = function () {
     document.getElementById("modalOverlay").classList.add("hidden");
     document.getElementById("taskModal").classList.add("hidden");
     if (addTaskForm) addTaskForm.reset();
   };
 
+  window.openEditModal = function (taskId, taskName, taskDescription) {
+    currentEditTaskId = taskId;
+    document.getElementById("editModalOverlay").classList.remove("hidden");
+    document.getElementById("editTaskModal").classList.remove("hidden");
+
+    document.getElementById("editTaskId").value = taskId;
+    document.getElementById("editTaskName").value = taskName;
+    document.getElementById("editDescription").value = taskDescription;
+
+    document.getElementById("editTaskName").focus();
+  };
+
+  window.closeEditModal = function () {
+    document.getElementById("editModalOverlay").classList.add("hidden");
+    document.getElementById("editTaskModal").classList.add("hidden");
+    if (editTaskForm) editTaskForm.reset();
+    currentEditTaskId = null;
+  };
+
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
       window.closeModal();
+      window.closeEditModal();
     }
   });
 
