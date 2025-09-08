@@ -47,7 +47,7 @@ function login(account){
             setUser(response.data);
             window.location.href = `${BASE_URL}/todo.html`;
         }else{
-            console.log("Error ", response.message);
+            alert(response.message);
         }
     };
 
