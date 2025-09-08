@@ -42,7 +42,6 @@ function login(account){
     
     xhttp.onload = () => {
         const response = JSON.parse(xhttp.responseText);
-        console.log(response);
         if(response.status === 200){
             setUser(response.data);
             window.location.href = `${BASE_URL}/todo.html`;

@@ -46,7 +46,6 @@ async function getTasks() {
         if (response && response.status === 200) {
           return response;
         }
-        console.warn('Active tasks request failed:', response);
         return { status: 200, data: {} };
       }),
       $.ajax({
@@ -57,7 +56,6 @@ async function getTasks() {
         if (response && response.status === 200) {
           return response;
         }
-        console.warn('Inactive tasks request failed:', response);
         return { status: 200, data: {} };
       })
     ]);
@@ -84,7 +82,6 @@ async function getTasks() {
         });
       }
 
-      console.log('Combined tasks data:', combinedData);
       return combinedData;
     } else {
       throw new Error('Failed to fetch tasks');
