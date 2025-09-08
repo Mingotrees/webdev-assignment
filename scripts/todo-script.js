@@ -1,33 +1,222 @@
 import { getUser, API, logOut, BASE_URL } from "./constants.js";
 
 let currentEditTaskId = null;
+const $addTaskForm = $("#addTaskForm");
+const $taskList = $("#taskList");
+const $editTaskForm = $("#editTaskForm");
+const $signOutBtn = $("#signOut-btn");
 
-document.addEventListener("DOMContentLoaded", () => {
-  const addTaskForm = document.getElementById("addTaskForm");
-  const taskList = document.getElementById("taskList");
-  const editTaskForm = document.getElementById("editTaskForm");
-  const signOutBtn = $("#signOut-btn");
+/**
+ * DELETE FUNCTION
+ * @param {} taskId 
+ */
+async function deleteTask(taskId) {
+    const response = await $.ajax({
+      url: `${API}/deleteItem_action.php?item_id=${taskId}`,
+      method: "POST", //gi block nimong DELETE SIR
+    });
 
-  if(!getUser()){
-    alert("Please Log In First");
-    window.location.href = `${BASE_URL}/index.html`;
+    const data = JSON.parse(response);
+    if(data.status === 200){
+      await loadTasks();
+    }else{
+      alert("Error deleting task.");
+    }
+}
+
+
+/**
+ * GET TASKS
+ * @returns 
+ */
+async function getTasks() {
+  const user = getUser();
+  if (!user || !user.id) {
+    return Promise.reject("No user logged in.");
   }
 
+  try {
+    // Make both requests in parallel
+    const [activeResponse, inactiveResponse] = await Promise.all([
+       $.ajax({
+        url: `${API}/getItems_action.php?user_id=${user.id}&status=active`,
+        method: "GET",
+        dataType: "json"
+      }).then(response => {
+        if (response && response.status === 200) {
+          return response;
+        }
+        console.warn('Active tasks request failed:', response);
+        return { status: 200, data: {} };
+      }),
+      $.ajax({
+        url: `${API}/getItems_action.php?user_id=${user.id}&status=inactive`,
+        method: "GET",
+        dataType: "json"
+      }).then(response => {
+        if (response && response.status === 200) {
+          return response;
+        }
+        console.warn('Inactive tasks request failed:', response);
+        return { status: 200, data: {} };
+      })
+    ]);
 
-  signOutBtn.on('click', ()=>{
-      logOut();
-      window.location.href = `${BASE_URL}/index.html`;
-  });
+    // Check if at least one request was successful
+    if (activeResponse.status === 200 || inactiveResponse.status === 200) {
+      // Combine the results using actual item_id as keys
+      const combinedData = {
+        status: 200,
+        data: {}
+      };
 
-  // Load tasks from API
-  async function loadTasks() {
+      // Add active tasks using item_id as key
+      if (activeResponse.data && Object.keys(activeResponse.data).length > 0) {
+        Object.values(activeResponse.data).forEach(task => {
+          combinedData.data[task.item_id] = task;
+        });
+      }
+
+      // Add inactive tasks using item_id as key
+      if (inactiveResponse.data && Object.keys(inactiveResponse.data).length > 0) {
+        Object.values(inactiveResponse.data).forEach(task => {
+          combinedData.data[task.item_id] = task;
+        });
+      }
+
+      console.log('Combined tasks data:', combinedData);
+      return combinedData;
+    } else {
+      throw new Error('Failed to fetch tasks');
+    }
+  } catch (err) {
+     console.error("Error fetching tasks:", err);
+    throw err;
+  }
+}
+
+
+
+/**
+ * EDIT FUNCTION
+ * @param {*} taskId 
+ * @param {*} newName 
+ * @param {*} newDesc 
+ * @returns 
+ */
+
+async function editTask(taskId, newName, newDesc) {
+  const user = getUser();
+  if (!user || !user.id) {
+    alert("User not logged in.");
+    return;
+  }
+  try {
+    const response = await $.ajax({
+      url: `${API}/editItem_action.php`,
+      method: "POST",
+      data: JSON.stringify({
+        item_id: taskId,
+        item_name: newName,
+        item_description: newDesc,
+        status: "active"
+      }),
+      
+    });
+    console.log("Task ID: ", taskId);
+    const data = JSON.parse(response);
+    
+    if (data.status === 200) {
+      await loadTasks();
+      closeEditModal();
+    } else {
+      alert(data.message || "Error updating task.");
+    }
+  } catch (err) {
+    console.error("Error editing task:", err);
+    alert("Error editing task.");
+  }
+}
+
+
+/**
+ * ADD TASK FUNCTION
+ * @param {*} taskName 
+ * @param {*} taskDesc 
+ * @returns 
+ */
+
+async function addTask(taskName, taskDesc) {
+  const user = getUser();
+  if (!user || !user.id) {
+    alert("User not logged in.");
+    return;
+  }
+  try {
+    const response = await $.ajax({
+      url: `${API}/addItem_action.php`,
+      method: "POST",
+      data: JSON.stringify({
+        user_id: user.id,
+        item_description: taskDesc,
+        item_name: taskName,
+      }),
+    });
+      await loadTasks();
+      closeModal();
+  } catch (err) {
+    alert("Error adding task.");
+  }
+}
+
+/**
+ * UPDATES TASKS
+ * @param {*} taskId 
+ * @param {*} status 
+ * @returns 
+ */
+
+async function updateTaskStatus(taskId, status) {
+  const user = getUser();
+  if (!user || !user.id) {
+    alert("User not logged in.");
+    return;
+  }
+  try {
+    const response = await $.ajax({
+      url: `${API}/statusItem_action.php`,
+      method: "POST",
+      data: JSON.stringify({
+        user_id: user.id,
+        item_id: taskId,
+        status: status   // only ever mark inactive
+      }),
+    });
+
+    const data = typeof response === "string" ? JSON.parse(response) : response;
+    if (data.status === 200) {
+      console.log(`Task ${taskId} marked inactive`);
+    } else {
+      console.error("Error updating task:", data.message);
+    }
+  } catch (err) {
+    console.error("Error in updateTaskStatus:", err);
+  }
+}
+
+
+/**
+ * LOADS TASKS
+ */
+
+async function loadTasks() {
     try {
       const response = await getTasks();
-      taskList.innerHTML = "";
+      $taskList.empty();
+      
       if (response && response.status === 200 && response.data && Object.keys(response.data).length > 0) {
         Object.values(response.data).forEach(item => {
-          const li = document.createElement("li");
-          li.innerHTML = `
+          const $li = $('<li>').html(`
               <div class="flex items-center justify-between">
                 <div class="inline-flex items-center">
                   <input
@@ -83,266 +272,117 @@ document.addEventListener("DOMContentLoaded", () => {
                   </button>
                 </div>
               </div>
-          `;
-          taskList.appendChild(li);
-
-          const checkBox = li.querySelector(".task-checkbox");
-          const taskLabel = li.querySelector(".task-label");
-
-          checkBox.addEventListener("change", () => {
-            const taskId = checkBox.getAttribute("data-id");
-            if (checkBox.checked) {
-              taskLabel.classList.remove("text-paper");
-              taskLabel.classList.add("line-through", "text-gray-400");
-              updateTaskStatus(taskId, 'inactive');
+          `);
+          $taskList.prepend($li);
+        
+          $li.find('.task-checkbox').on('change', async function() {
+            const taskId = $(this).data('id');
+            const $taskLabel = $(this).closest('div').find('.task-label');
+            
+            if (this.checked) {
+              $taskLabel.removeClass('text-paper').addClass('line-through text-gray-400');
+              await updateTaskStatus(taskId, 'inactive');
             } else {
-              taskLabel.classList.add("text-paper");
-              taskLabel.classList.remove("line-through", "text-gray-400");
-              updateTaskStatus(taskId, 'active');
+              $taskLabel.addClass('text-paper').removeClass('line-through text-gray-400');
+              await updateTaskStatus(taskId, 'active');
             }
           });
 
         });
       } else {
-        taskList.innerHTML = `<li class= "text-paper" >No tasks found.</li>`;
+        $taskList.html(`<li class= "text-paper" >No tasks found.</li>`);
       }
     } catch (err) {
       console.error("Error fetching tasks:", err);
-      taskList.innerHTML = "<li class = text-paper>Error loading tasks.</li>";
+      $taskList.html('<li class = text-paper>Error loading tasks.</li>');
     }
-  }
-
-  async function editTask(taskId, newName, newDesc) {
-    const user = getUser();
-    if (!user || !user.id) {
-      alert("User not logged in.");
-      return;
-    }
-    try {
-      const response = await $.ajax({
-        url: `${API}/editItem_action.php`,
-        method: "POST",
-        data: JSON.stringify({
-          item_id: taskId,
-          item_name: newName,
-          item_description: newDesc,
-          status: "active"
-        }),
-        
-      });
-      console.log("Task ID: ", taskId);
-      const data = JSON.parse(response);
-      
-      if (data.status === 200) {
-        loadTasks();
-      } else {
-        alert(data.message || "Error updating task.");
-      }
-    } catch (err) {
-      console.error("Error editing task:", err);
-      alert("Error editing task.");
-    }
-  }
-
-  // Add task via API
-  async function addTask(taskName, taskDesc) {
-    const user = getUser();
-    if (!user || !user.id) {
-      alert("User not logged in.");
-      return;
-    }
-    try {
-      const response = await $.ajax({
-        url: `${API}/addItem_action.php`,
-        method: "POST",
-        data: JSON.stringify({
-          user_id: user.id,
-          item_description: taskDesc,
-          item_name: taskName,
-        }),
-      });
-        loadTasks();
-        closeModal();
-    } catch (err) {
-      alert("Error adding task.");
-    }
-  }
-
-
-  async function deleteTask(taskId) {
-    try {
-      const response = await $.ajax({
-        url: `${API}/deleteItem_action.php?item_id=${taskId}`,
-        method: "POST", //gi block nimong DELETE SIR
-      });
-
-      const data = JSON.parse(response);
-      if(data.status === 200){
-        loadTasks();
-      }else{
-        alert("Error deleting task.");
-      }
-    } catch (err) {
-      alert("Error deleting task.");
-    }
-  }
-  
-// --- NEW FUNCTION: update task status ---
-
-async function updateTaskStatus(taskId, status) {
-  const user = getUser();
-  if (!user || !user.id) {
-    alert("User not logged in.");
-    return;
-  }
-  try {
-    const response = await $.ajax({
-      url: `${API}/statusItem_action.php`,
-      method: "POST",
-      data: JSON.stringify({
-        user_id: user.id,
-        item_id: taskId,
-        status: status   // only ever mark inactive
-      }),
-    });
-
-    const data = typeof response === "string" ? JSON.parse(response) : response;
-    if (data.status === 200) {
-      console.log(`Task ${taskId} marked inactive`);
-       // refresh task list
-    } else {
-      console.error("Error updating task:", data.message);
-    }
-  } catch (err) {
-    console.error("Error in updateTaskStatus:", err);
-  }
 }
 
-  // Handle add task form submit
-   if (addTaskForm) {
-    addTaskForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const taskName = document.getElementById("taskName").value.trim();
-      const description = document.getElementById("description").value.trim();
-      if (taskName) {
-        addTask(taskName, description);
-      }
-    });
-  }
+window.openModal = function() {
+  $('#modalOverlay, #taskModal').removeClass('hidden');
+  $('#taskName').focus();
+};
 
-  if (editTaskForm) {
-    editTaskForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const taskName = document.getElementById("editTaskName").value.trim();
-      const description = document
-        .getElementById("editDescription")
-        .value.trim();
-      if (taskName && currentEditTaskId) {
-        editTask(currentEditTaskId, taskName, description);
-      }
-    });
-  }
+window.closeModal = function() {
+  $('#modalOverlay, #taskModal').addClass('hidden');
+  $addTaskForm[0].reset();
+};
 
-if (taskList) {
-    taskList.addEventListener("click", function (e) {
-      const deleteBtn = e.target.closest(".delete-btn");
-      const editBtn = e.target.closest(".edit-btn");
+window.openEditModal = function(taskId, taskName, taskDescription) {
+  currentEditTaskId = taskId;
+  $('#editModalOverlay, #editTaskModal').removeClass('hidden');
+  $('#editTaskId').val(taskId);
+  $('#editTaskName').val(taskName);
+  $('#editDescription').val(taskDescription);
+  $('#editTaskName').focus();
+};
 
-      if (deleteBtn) {
-        const taskId = deleteBtn.getAttribute("data-id");
-        if (confirm("Are you sure you want to delete this task?")) {
-          deleteTask(taskId);
-        }
-      }
+window.closeEditModal = function() {
+  $('#editModalOverlay, #editTaskModal').addClass('hidden');
+  $editTaskForm[0].reset();
+  currentEditTaskId = null;
+};
 
-      if (editBtn) {
-        const taskId = editBtn.getAttribute("data-id");
-        const taskName = editBtn.getAttribute("data-name");
-        const taskDesc = editBtn.getAttribute("data-desc");
+// Set up event handlers outside DOMContentLoaded
+$signOutBtn.on('click', () => {
+  logOut();
+  window.location.href = `${BASE_URL}/index.html`;
+});
 
-        openEditModal(taskId, taskName, taskDesc);
-      }
-    });
-  }
+if ($addTaskForm) {
+  $addTaskForm.on("submit", function (e) {
+    e.preventDefault();
+    const taskName = $("#taskName").val().trim();
+    const description = $("#description").val().trim();
+    if (taskName) {
+      addTask(taskName, description);
+    }
+  });
+}
 
-  // Modal functions
-    window.openModal = function () {
-    document.getElementById("modalOverlay").classList.remove("hidden");
-    document.getElementById("taskModal").classList.remove("hidden");
-    document.getElementById("taskName").focus();
-  };
+if ($editTaskForm) {
+  $editTaskForm.on("submit", function (e) {
+    e.preventDefault();
+    const taskName = $("#editTaskName").val().trim();
+    const description = $("#editDescription").val().trim();
+    if (taskName && currentEditTaskId) {
+      editTask(currentEditTaskId, taskName, description);
+    }
+  });
+}
 
-  window.closeModal = function () {
-    document.getElementById("modalOverlay").classList.add("hidden");
-    document.getElementById("taskModal").classList.add("hidden");
-    if (addTaskForm) addTaskForm.reset();
-  };
-
-  window.openEditModal = function (taskId, taskName, taskDescription) {
-    currentEditTaskId = taskId;
-    document.getElementById("editModalOverlay").classList.remove("hidden");
-    document.getElementById("editTaskModal").classList.remove("hidden");
-
-    document.getElementById("editTaskId").value = taskId;
-    document.getElementById("editTaskName").value = taskName;
-    document.getElementById("editDescription").value = taskDescription;
-
-    document.getElementById("editTaskName").focus();
-  };
-
-  window.closeEditModal = function () {
-    document.getElementById("editModalOverlay").classList.add("hidden");
-    document.getElementById("editTaskModal").classList.add("hidden");
-    if (editTaskForm) editTaskForm.reset();
-    currentEditTaskId = null;
-  };
-
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") {
-      window.closeModal();
-      window.closeEditModal();
+if ($taskList) {
+  $taskList.on('click', '.delete-btn', function(e) {
+    e.preventDefault(); 
+    e.stopPropagation();
+    const taskId = $(this).data('id');
+    if (confirm("Are you sure you want to delete this task?")) {
+      deleteTask(taskId);
     }
   });
 
+  $taskList.on('click', '.edit-btn', function() {
+    const taskId = $(this).data('id');
+    const taskName = $(this).data('name');
+    const taskDesc = $(this).data('desc');
+    openEditModal(taskId, taskName, taskDesc);
+  });
+}
+
+$(document).on('keydown', function(e) {
+  if (e.key === 'Escape') {
+    window.closeModal();
+    window.closeEditModal();
+  }
+});
+
+// Keep only essential initialization in DOMContentLoaded
+document.addEventListener("DOMContentLoaded", () => {
+  if(!getUser()){
+    alert("Please Log In First");
+    window.location.href = `${BASE_URL}/index.html`;
+  }
+  
   // Initial load
   loadTasks();
 });
-
-// Helper: get tasks from API
-
-async function getTasks() {
-  const user = getUser();
-  if (!user || !user.id) {
-    return Promise.reject("No user logged in.");
-  }
-
-  try {
-    // Make both requests in parallel
-    const [activeResponse, inactiveResponse] = await Promise.all([
-      $.ajax({
-        url: `${API}/getItems_action.php?user_id=${user.id}&status=active`,
-        method: "GET",
-        dataType: "json"
-      }),
-      $.ajax({
-        url: `${API}/getItems_action.php?user_id=${user.id}&status=inactive`,
-        method: "GET",
-        dataType: "json"
-      })
-    ]);
-
-    // Combine the results
-    const combinedData = {
-      status: 200,
-      data: {
-        ...activeResponse.data,
-        ...inactiveResponse.data
-      }
-    };
-
-    return combinedData;
-  } catch (err) {
-    console.error("Error fetching tasks:", err);
-    throw err;
-  }
-}
